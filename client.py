@@ -18,3 +18,4 @@ while 1:
 	time.sleep(5)
 s.close()
 print 'Received', repr(data)
+print '---------'
