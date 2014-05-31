@@ -9,15 +9,34 @@ PORT = 5005              # The same port as used by the server
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
+
+
+
+msg={
+	'func':'get_id',
+	'params':['random-bot'],
+}
+msg=simplejson.dumps(msg)
+s.send("%04d"%len(msg)+msg)
+
+size=int(s.recv(4))
+msg=simplejson.loads(s.recv(size))
+secret_id=msg['return']
+
 while 1:
 	msg={
-		'func':'get_id',
-		'params':['artur1'],
+		'func':'get_card',
+		'params':[],
+		'secret_id': secret_id,
 	}
 	msg=simplejson.dumps(msg)
 	s.send("%04d"%len(msg)+msg)
-	print s.recv(1024)
-	time.sleep(5)
+
+	size=int(s.recv(4))
+	msg=simplejson.loads(s.recv(size))
+	print msg
+
+	time.sleep(0.1)
 s.close()
 print 'Received', repr(data)
 print '---------'

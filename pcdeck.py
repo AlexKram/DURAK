@@ -60,7 +60,10 @@ class DECK():
 			if self.deck[0].get_suit()==card.get_suit():
 				card._set_trump_()
 	def get_card(self):
-		return self.deck.pop()
+		try:
+			return self.deck.pop()
+		except:
+			return None
 	def __unicode__(self):
 		return "\n".join(map(str,self.deck))
 	def __str__(self):
