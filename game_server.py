@@ -13,34 +13,47 @@ import uuid
 TIMEOUT=2000
 class MEMBER():
 	def __init__(self,name):
-		self.name=name
-		self.secret_id=str(uuid.uuid1())
-		self.last_time=time.time()
-	def get_secret_id(self):
-		return self.secret_id
-	def check_timeout(self):
-		return time.time()-self.last_time>TIMEOUT
-	def get_mode(self):
-		return self.mode
-	def get_mode(self):
-		return "MEMBER"
-
-class MASTER():
-	def __init__(self):
-		self.secret_id=str(uuid.uuid1())
-	def get_secret_id(self):
-		return self.secret_id
-	def get_mode(self):
-		return "MASTER"
+		self._name_=name
+		self._secret_id_=str(uuid.uuid1())
+		self._num_of_cards_=0
+		self._posi
+tion_=None
+	@property
+	def name(self):
+		return self._name_
+	@property
+	def secret_id(self):
+		return self._secret_id_
+	@property
+	def num_of_cards(self):
+		return self._num_of_cards_
+	@num_of_cards.setter
+	def num_of_cards(self,value):
+		self._num_of_cards_=value
+	@property
+	def position(self):
+		return self._position_
+	@position.setter
+	def position(self,value):
+		self._position_=value
 
 class DECK():
 	def __init__(self):
-		self.secret_id="secret_deck"
+		self._secret_id_="secret_deck"
 		self.card=None
 		self.deck_clean=False
 		self.init=False
-	def get_secret_id(self):
-		return self.secret_id
+		self._trump_card_=None
+	@property
+	def secret_id(self):
+		return self._secret_id_
+	@property
+	def trump_card(self):
+		return self._trump_card_
+	@trump_card.setter
+	def trump_card(self, value):
+		self._trump_card_=value
+
 	def get_mode(self):
 		return "DECK"
 	def get_card(self):
@@ -63,17 +76,22 @@ class DECK():
 		self.init=True
 		return {}
 MAX_MEMBERS=5
+
+#STATES
+STATE_INIT	=0
+STATE_REGISTER	=1
+STATE_RAISE_HAND=2
 class WORKER():
 	def __init__(self):
-		self.members={}
-		self.master=MASTER()
-		self.deck=DECK()
-		print "Master: ",self.master.get_secret_id()
-		print "Deck: ",self.deck.get_secret_id()
+		self.STATE=STATE_INIT
+
+		
 
 	def ext_get_id(self,name):
 		if len(self.members.keys())>MAX_MEMBERS:
 			return {'error': 'To much Members'}
+		if name in [x.name for x in self.members.values()]:
+			return {'error': "Name already in use"}
 		m=MEMBER(name)
 		self.members[m.get_secret_id()]=m
 		return {'return':m.get_secret_id()}
@@ -81,9 +99,12 @@ class WORKER():
 	def ext_get_card(self,member):
 		#XXX
 		#TODO check valid order for getting a card
+		(self.player_on_turn or 1) 
+		
 		try:
 			card = self.deck.get_card()
 			if card:
+				member.num_of_cards+=1
 				return {'return': card}
 			return {'error': "please try again"}
 		except:
@@ -92,10 +113,52 @@ class WORKER():
 		
 
 	def msg_work(self,msg):
+		if type(msg)!=type({}):
+			return {'error':'No dict given'}
 
 		func=msg.setdefault('func','get_task')
-		print func
+		secret_id=msg.setdefault('secret_id','bullshit')
 
+		if self.STATE==STATE_INIT:
+			self.members={}
+			self.deck=DECK()
+			self.player_on_turn=None
+			print "Deck: ",self.deck.get_secret_id()
+
+			if secret_id==self.deck.get_secret_id() and func=='init_done':
+				self.deck.trump_card=msg['trump_card']
+				self.STATE=STATE_REGISTER
+				return {'return': 'Initialisation successfull!'}
+			else
+				return {'error': 'bullshit'}
+
+		if self.STATE==STATE_REGISTER:
+			if func=='get_id':
+				try:
+					return self.ext_get_id(*msg['params'])
+				except:
+					return {'error': 'bullshit'}
+			if func=='get_players':
+				return dict([(x.name,x.position) for x in self.members.values()])
+
+			if secret_id==self.deck.get_secret_id() and func=='set_players':
+				msg.setdefault('params',[[]])
+				if len(set([msg['params'][0]))>1 and \
+				   len(set([x.name for x in self.members.values()]) - set(msg['params'][0]))==0:
+					counter=0
+					for x in msg['params'][0]:
+						for m in self.members.values():
+							if m.name==x:
+								m.position=counter
+								counter+=1					
+
+					self.STATE=STATE_RAISE_HAND
+					return {'return': 'Registration successfull!'}
+				else:
+					return {'error': 'bullshit'}
+
+
+		return {}
 		#NEW member
 		if func=='get_id':
 			try:
@@ -105,10 +168,7 @@ class WORKER():
 
 
 		#find unknown client	
-		try:
-			secret_id=msg['secret_id']
-		except:
-			return {'error':'No secret_id given'}
+
 		
 		member=None
 		if secret_id==self.master.get_secret_id():
