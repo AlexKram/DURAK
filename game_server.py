@@ -129,7 +129,7 @@ class WORKER():
 				ret=['get_players','set_players']+ret
 			if self.STATE==STATE_RAISE_HAND and self.deck._card_==None:
 				ret=['set_card']+ret
-			return ret
+			return {'return':ret}
 		return member.ext_get_tasks()
 
 	@deco(STATE_INIT|STATE_DECK_MEMBER)
