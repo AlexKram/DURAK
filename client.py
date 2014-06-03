@@ -11,12 +11,12 @@ PORT = 5005              # The same port as used by the server
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
 
-
+secret_id="secret_deck"
 
 msg={
 	'func':'init_done',
 	'params':['asdasd'],
-	'secret_id':"secret_deck",
+	'secret_id':secret_id,
 }
 msg=simplejson.dumps(msg)
 s.send("%04d"%len(msg)+msg)
@@ -26,10 +26,9 @@ msg=simplejson.loads(s.recv(size))
 print msg
 
 
-sys.exit(1)
 while 1:
 	msg={
-		'func':'get_card',
+		'func':'get_tasks',
 		'params':[],
 		'secret_id': secret_id,
 	}

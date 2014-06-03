@@ -86,6 +86,7 @@ STATE_INIT	=2**0
 STATE_REGISTER	=2**1
 STATE_RAISE_HAND=2**2
 STATE_UNKNOWN	=2**3
+STATE_ALL_ABOVE=2**17-1
 
 STATE_NEED_MEMBER=2**18
 STATE_DECK_MEMBER=2**19
@@ -116,6 +117,21 @@ class WORKER():
 		self.player_on_turn=None
 		self.STATE=STATE_INIT
 
+	@deco(STATE_ALL_ABOVE)
+	def ext_get_tasks(self,member=None):
+		if member==None:
+			return {'return':['get_tasks','get_trump_card']}
+		if hasattr(member,'card'):
+			ret=['get_tasks','get_trump_card']
+			if self.STATE==STATE_INIT:
+				ret=['init_done']+ret
+			if self.STATE==STATE_REGISTER:
+				ret=['get_players','set_players']+ret
+			if self.STATE==STATE_RAISE_HAND and self.deck._card_==None:
+				ret=['set_card']+ret
+			return ret
+		return member.ext_get_tasks()
+
 	@deco(STATE_INIT|STATE_DECK_MEMBER)
 	def ext_init_done(self,trump_card,member=None):
 		print "INIT"
@@ -144,7 +160,7 @@ class WORKER():
 		if hasattr(self,"ext_"+func):
 			return getattr(self,"ext_"+func)(*params,member=member)
 		else:
-			return {'error': "Wrong params"}
+			return {'error': "No such function"}
 
 
 #
