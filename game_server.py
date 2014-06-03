@@ -10,14 +10,13 @@ import random
 import uuid
 
 
-TIMEOUT=2000
+
 class MEMBER():
 	def __init__(self,name):
 		self._name_=name
 		self._secret_id_=str(uuid.uuid1())
 		self._num_of_cards_=0
-		self._posi
-tion_=None
+		self._position_=None
 	@property
 	def name(self):
 		return self._name_
@@ -40,9 +39,8 @@ tion_=None
 class DECK():
 	def __init__(self):
 		self._secret_id_="secret_deck"
-		self.card=None
-		self.deck_clean=False
-		self.init=False
+		self._card_=None
+		self._deck_empty_=False
 		self._trump_card_=None
 	@property
 	def secret_id(self):
@@ -53,19 +51,22 @@ class DECK():
 	@trump_card.setter
 	def trump_card(self, value):
 		self._trump_card_=value
-
-	def get_mode(self):
-		return "DECK"
-	def get_card(self):
-		if self.deck_clean:
+	@property
+	def card(self):
+		if self.deck_empty:
 			raise Exception("No card on stack")
-		tmpcard=self.card
-		self.card=None
-		return tmpcard
-	def ext_set_card(self,card):
-		self.card=card
-	def ext_empty_deck(self):
-		self.deck_clean=True
+		tmp_card=self._card_
+		self._card_=None
+		return tmp_card
+	@card.setter
+	def card(self,value):
+		self._card_=value
+	@property
+	def deck_empty(self):
+		return self._deck_empty_
+	@deck_empty.setter
+	def deck_empty(self,value):
+		self._deck_empty_=value
 	def ext_get_task(self):
 		if not self.init:
 			return {'return': 'init'}
@@ -75,42 +76,56 @@ class DECK():
 	def ext_init(self):
 		self.init=True
 		return {}
+
+
+
 MAX_MEMBERS=5
 
 #STATES
-STATE_INIT	=0
-STATE_REGISTER	=1
-STATE_RAISE_HAND=2
+STATE_INIT	=2**0
+STATE_REGISTER	=2**1
+STATE_RAISE_HAND=2**2
+STATE_UNKNOWN	=2**3
+
+STATE_NEED_MEMBER=2**18
+STATE_DECK_MEMBER=2**19
+
+
+def deco(state):
+	def STATER(func):
+		def real_func(self,*args,**kwargs):
+			if self.STATE&state:
+				if STATE_NEED_MEMBER&state and kwargs['member']==None:
+					return {'error': "No Member"}
+				if STATE_DECK_MEMBER&state and not hasattr(kwargs['member'],'card'):
+					return {'error': "No Deck Member"}
+				try:
+					ret=func(self,*args,**kwargs)
+				except None:
+					ret = {'error': "PYTHON EXCEPTION"}
+				return ret
+			return {'error': "Invalid state"}
+		return real_func
+	return STATER
+
 class WORKER():
+
 	def __init__(self):
+		self.members={}
+		self.deck=DECK()
+		self.player_on_turn=None
 		self.STATE=STATE_INIT
 
-		
+	@deco(STATE_INIT|STATE_DECK_MEMBER)
+	def ext_init_done(self,trump_card,member=None):
+		print "INIT"
+		self.members={}
+		self.deck=DECK()
+		self.player_on_turn=None
+		self.deck.trump_card=trump_card
+		self.STATE=STATE_REGISTER
+		return {'return': 'Initialisation successfull!'}
 
-	def ext_get_id(self,name):
-		if len(self.members.keys())>MAX_MEMBERS:
-			return {'error': 'To much Members'}
-		if name in [x.name for x in self.members.values()]:
-			return {'error': "Name already in use"}
-		m=MEMBER(name)
-		self.members[m.get_secret_id()]=m
-		return {'return':m.get_secret_id()}
-	
-	def ext_get_card(self,member):
-		#XXX
-		#TODO check valid order for getting a card
-		(self.player_on_turn or 1) 
-		
-		try:
-			card = self.deck.get_card()
-			if card:
-				member.num_of_cards+=1
-				return {'return': card}
-			return {'error': "please try again"}
-		except:
-			return {'return': None}
-		
-		
 
 	def msg_work(self,msg):
 		if type(msg)!=type({}):
@@ -118,79 +133,177 @@ class WORKER():
 
 		func=msg.setdefault('func','get_task')
 		secret_id=msg.setdefault('secret_id','bullshit')
+		params=msg.setdefault('params',[])
 
-		if self.STATE==STATE_INIT:
-			self.members={}
-			self.deck=DECK()
-			self.player_on_turn=None
-			print "Deck: ",self.deck.get_secret_id()
-
-			if secret_id==self.deck.get_secret_id() and func=='init_done':
-				self.deck.trump_card=msg['trump_card']
-				self.STATE=STATE_REGISTER
-				return {'return': 'Initialisation successfull!'}
-			else
-				return {'error': 'bullshit'}
-
-		if self.STATE==STATE_REGISTER:
-			if func=='get_id':
-				try:
-					return self.ext_get_id(*msg['params'])
-				except:
-					return {'error': 'bullshit'}
-			if func=='get_players':
-				return dict([(x.name,x.position) for x in self.members.values()])
-
-			if secret_id==self.deck.get_secret_id() and func=='set_players':
-				msg.setdefault('params',[[]])
-				if len(set([msg['params'][0]))>1 and \
-				   len(set([x.name for x in self.members.values()]) - set(msg['params'][0]))==0:
-					counter=0
-					for x in msg['params'][0]:
-						for m in self.members.values():
-							if m.name==x:
-								m.position=counter
-								counter+=1					
-
-					self.STATE=STATE_RAISE_HAND
-					return {'return': 'Registration successfull!'}
-				else:
-					return {'error': 'bullshit'}
-
-
-		return {}
-		#NEW member
-		if func=='get_id':
-			try:
-				return self.ext_get_id(*msg['params'])
-			except:
-				return {'error': 'bullshit'}
-
-
-		#find unknown client	
-
-		
 		member=None
-		if secret_id==self.master.get_secret_id():
-			member=self.master
-
-		if secret_id==self.deck.get_secret_id():
+		if self.members.has_key(secret_id):
+			member=self.members[secret_id]
+		if secret_id==self.deck.secret_id:
 			member=self.deck
 
-		if not member:
-			try:
-				member=self.members[secret_id]
-			except:
-				return {'error':'No such member'}
-		
-		try:	
-			return getattr(self,"ext_"+func)(member,*msg['params'])
-		except:
-			try:
-				return getattr(member,"ext_"+func)(*msg['params'])
-			except:
-				pass
+		if hasattr(self,"ext_"+func):
+			return getattr(self,"ext_"+func)(*params,member=member)
+		else:
 			return {'error': "Wrong params"}
+
+
+#
+#
+#
+#
+#
+#	def ext_get_id(self,name):
+#		if len(self.members.keys())>MAX_MEMBERS:
+#			return {'error': 'To much Members'}
+#		if name in [x.name for x in self.members.values()]:
+#			return {'error': "Name already in use"}
+#		m=MEMBER(name)
+#		self.members[m.get_secret_id()]=m
+#		return {'return':m.get_secret_id()}
+#	
+#	def ext_get_card(self,member):
+#		#XXX
+#		#TODO check valid order for getting a card
+#		(self.player_on_turn or 1) 
+#		
+#		try:
+#			card = self.deck.card
+#			if card:
+#				member.num_of_cards+=1
+#				return {'return': card}
+#			return {'error': "please try again"}
+#		except:
+#			return {'return': None}
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#		if self.STATE==STATE_INIT:
+#			self.members={}
+#			self.deck=DECK()
+#			self.player_on_turn=None
+#			print "Deck: ",self.deck.get_secret_id()
+#
+#			if secret_id==self.deck.get_secret_id() and func=='init_done':
+#				self.deck.trump_card=msg['trump_card']
+#				self.STATE=STATE_REGISTER
+#				return {'return': 'Initialisation successfull!'}
+#			else
+#				return {'error': 'bullshit'}
+#
+#		if self.STATE==STATE_REGISTER:
+#			if func=='get_id':
+#				try:
+#					return self.ext_get_id(*msg['params'])
+#				except:
+#					return {'error': 'bullshit'}
+#			if func=='get_players':
+#				return dict([(x.name,x.position) for x in self.members.values()])
+#
+#			if secret_id==self.deck.get_secret_id() and func=='set_players':
+#				msg.setdefault('params',[[]])
+#				if len(set([msg['params'][0]))>1 and \
+#				   len(set([x.name for x in self.members.values()]) - set(msg['params'][0]))==0:
+#					counter=0
+#					for x in msg['params'][0]:
+#						for m in self.members.values():
+#							if m.name==x:
+#								m.position=counter
+#								counter+=1					
+#
+#					for x in self.members.keys():
+#						if self.members[x].position==None:
+#							del self.members[x]
+#					self.STATE=STATE_RAISE_HAND
+#					return {'return': 'Registration successfull!'}
+#				else:
+#					return {'error': 'bullshit'}
+#		if self.STATE==STATE_RAISE_HAND:
+#			if secret_id==self.deck.get_secret_id():
+#				if func=="set_card":
+#					tmpcard=self.deck.card
+#					if tmpcard==None:
+#						self.deck.card=msg['params'][0]
+#						return {'return': 'ok'}
+#					else:
+#						self.deck.card=tmpcard
+#						return {'error': 'card stack full'}
+#				return {'error': 'no such function'}
+#			else:
+#				try:
+#					member=self.members[secret_id]
+#				except:
+#					return {'error': "Not such member"}
+#				if func=="get_card":
+#					card=self.get_card(member)
+##XXX check next
+#					if self.deck.deck_empty or \
+#					   len(filter(lambda x: x.num_of_cards>5,self.members.values()))==len(self.members.values()):
+#						self.STATE==STATE_UNKNOWN
+#					return card
+#				else:
+#					return {'error': "only get card"}
+#
+#		if self.STATE==STATE_UNKNOWN:
+#			print "Unknown state reached"
+#			self.STATE=STATE_INIT
+#			
+#
+#
+#		return {}
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#		#NEW member
+#		if func=='get_id':
+#			try:
+#				return self.ext_get_id(*msg['params'])
+#			except:
+#				return {'error': 'bullshit'}
+#
+#
+#		#find unknown client	
+#
+#		
+#		member=None
+#		if secret_id==self.master.get_secret_id():
+#			member=self.master
+#
+#		if secret_id==self.deck.get_secret_id():
+#			member=self.deck
+#
+#		if not member:
+#			try:
+#				member=self.members[secret_id]
+#			except:
+#				return {'error':'No such member'}
+#		
+#		try:	
+#			return getattr(self,"ext_"+func)(member,*msg['params'])
+#		except:
+#			try:
+#				return getattr(member,"ext_"+func)(*msg['params'])
+#			except:
+#				pass
+#			return {'error': "Wrong params"}
 	
 
 

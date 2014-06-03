@@ -3,6 +3,7 @@
 import socket
 import time
 import simplejson
+import sys
 
 HOST = '127.0.0.1'    # The remote host
 PORT = 5005              # The same port as used by the server
@@ -13,16 +14,19 @@ s.connect((HOST, PORT))
 
 
 msg={
-	'func':'get_id',
-	'params':['random-bot'],
+	'func':'init_done',
+	'params':['asdasd'],
+	'secret_id':"secret_deck",
 }
 msg=simplejson.dumps(msg)
 s.send("%04d"%len(msg)+msg)
 
 size=int(s.recv(4))
 msg=simplejson.loads(s.recv(size))
-secret_id=msg['return']
+print msg
 
+
+sys.exit(1)
 while 1:
 	msg={
 		'func':'get_card',
