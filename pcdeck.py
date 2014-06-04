@@ -20,7 +20,9 @@ RANKS={
 	14:'ACE',
 }
 
+from functools import total_ordering
 
+@total_ordering
 class CARD():
 	def __init__(self,suit,rank):
 		self.suit=suit
@@ -39,6 +41,8 @@ class CARD():
 	def __gt__(self,a):
 		return (self.get_rank()<a.get_rank() and self.get_suit()==a.get_suit()) or \
 		(not a.is_trump() and self.is_trump())
+	def __eq__(self,a):
+		return self.get_rank()==a.get_rank() and self.get_suit()==a.get_suit()
 	
 	def __unicode__(self):
 		return "%s-%s"%(RANKS[self.get_rank()],SUITS[self.get_suit()])
