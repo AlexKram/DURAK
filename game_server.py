@@ -141,7 +141,20 @@ class WORKER():
 		self.deck.trump_card=trump_card
 		self.STATE=STATE_REGISTER
 		return {'return': 'Initialisation successfull!'}
-
+	
+	@deco(STATE_REGISTER)
+	def ext_get_id(self,name):
+		if len(self.members.keys())>MAX_MEMBERS:
+			return {'error': 'Too much Members'}
+		if name in [x.name for x in self.members.values()]:
+			return {'error': 'Name already in use'}
+		m=MEMBER(name)
+		self.members[m.secret_id]=m
+		return {'return':m.secret_id}
+	
+	@deco(STATE_ALL_ABOVE)
+	def ext_get_players(self)
+		return dict([(x.name,x.position) for x in self.members.values()])
 
 	def msg_work(self,msg):
 		if type(msg)!=type({}):
