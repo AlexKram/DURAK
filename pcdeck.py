@@ -56,6 +56,7 @@ class CARD():
 class DECK():
 	def __init__(self):
 		self.deck=[]
+		self.trump_card=None
 	def shuffle(self):
 		self.deck=[CARD(suit,rank) for rank in RANKS.keys() for suit in SUITS.keys()]	
 		import random
@@ -63,6 +64,7 @@ class DECK():
 		for card in self.deck:
 			if self.deck[0].get_suit()==card.get_suit():
 				card._set_trump_()
+		self.trump_card=self.deck[0]
 	def get_card(self):
 		try:
 			return self.deck.pop()

@@ -12,6 +12,8 @@ secret_id="secret_deck"
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
 
+
+
 def msg_server(func='get_tasks',params=[]):
 	msg={
 		'func':func,
@@ -30,14 +32,39 @@ def msg_server(func='get_tasks',params=[]):
 
 
 
+from pcdeck import DECK
+
+def convert_card(x):
+	if x==None:
+		return None
+	return {
+		'suit':x.get_suit(),
+		'rank':x.get_rank(),
+		'trump':x.is_trump()
+	}
 
 
-
-msg_server()
-msg_server('init_done',['as'])
+init_players=set(['bot1','bot2'])
 
 while 1:
-	msg_server()
+	for x in msg_server('get_tasks')['return']:
+		if x=="init_done":
+			deck=DECK()
+			deck.shuffle()
+			print msg_server('init_done',[convert_card(deck.get_card())])
+			break;
+		if x=="set_card":
+			print msg_server('set_card',[convert_card(deck.get_card())])
+			break;
+		if x=="set_players":
+			names=msg_server('get_players',[])['return']
+			if len(init_players-names)==0:
+				print msg_server('set_players',[list(init_players)])
+			break;
+
+
+
+
 	time.sleep(0.1)
 
 s.close()
