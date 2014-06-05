@@ -66,22 +66,11 @@ class DECK():
 		return self._deck_empty_
 	@deck_empty.setter
 	def deck_empty(self,value):
-		self._deck_empty_=value
-	def ext_get_task(self):
-		if not self.init:
-			return {'return': 'init'}
-		if self.card==None:
-			return {'return': 'set_card'}
-		return {'return': 'none'}
-	def ext_init(self):
-		self.init=True
-		return {}
-
-
+		self._deck_empty_=True
 
 MAX_MEMBERS=5
 
-#STATES
+#STATES:
 STATE_INIT		=2**0
 STATE_REGISTER		=2**1
 STATE_RAISE_HAND	=2**2
@@ -121,18 +110,27 @@ class WORKER():
 
 	@deco(STATE_ALL_ABOVE)
 	def ext_get_tasks(self,member=None):
-		if member==None:
-			return {'return':['get_tasks','get_trump_card']}
+		ret = ['get_tasks','get_trump_card','get_players']
 		if hasattr(member,'card'):
-			ret=['get_tasks','get_trump_card']
 			if self.STATE==STATE_INIT:
 				ret=['init_done']+ret
 			if self.STATE==STATE_REGISTER:
-				ret=['get_players','set_players']+ret
-			if self.STATE==STATE_RAISE_HAND and self.deck._card_==None:
+				ret=['set_players']+ret
+			if self.STATE==STATE_RAISE_HAND and self.deck._card_==None and not self.deck.deck_empty:
 				ret=['set_card']+ret
 			return {'return':ret}
-		return member.ext_get_tasks()
+		if member!=None:
+			if self.STATE==STATE_INIT:
+				pass
+			if self.STATE==STATE_REGISTER:
+				ret=['get_id']+ret
+			if self.STATE==STATE_RAISE_HAND:
+				ret=['get_card']+ret
+			return {'return':ret}
+
+#-----------------------------------------------
+#		EXT-Functions:
+#-----------------------------------------------
 
 	@deco(STATE_INIT|STATE_DECK_MEMBER)
 	def ext_init_done(self,trump_card,member=None):
@@ -160,12 +158,28 @@ class WORKER():
 	
 	@deco(STATE_RAISE_HAND|STATE_NOT_DECK_MEMBER)
 	def ext_get_card(self,member):
-		card=self.deck.card
-		if card
-			member.num_of_cards+=1
-			return {'return':card}
-		elif self.deck.deck_empty
-			return {'return':None}	
+		if len(self.members.values())==len(filter(lambda x: x.num_of_cards>=6,self.members.values())):
+			if self.player_on_turn==None:
+				self.STATE=STATE_FIRST_ATTACKER
+			else:
+				self.STATE=STATE_UNKNOWN
+			return {'error': 'We must go to next State"}
+
+
+		if not self.player_on_turn==None:
+			e=self.player_on_turn
+			p=member.position
+			list_of_=list(reversed(map(lambda x: (x+e+1)%4,range(0,4))))[0:(e-p)%4]
+			ok_to_pull = len(list_of_)==len(filter(lambda x: (x.position in list_of_) and \
+								 x.num_of_cards>=6,self.members.values()))
+
+		if member.num_of_cards<6 and (self.player_on_turn==None or ok_to_pull):
+			card=self.deck.card
+			if card:
+				member.num_of_cards+=1
+				return {'return':card}
+			elif self.deck.deck_empty
+				return {'return':None}	
 		return {'error': 'Please try again'}
 
 	@deco(STATE_RAISE_HAND|STATE_DECK_MEMBER)
