@@ -82,15 +82,15 @@ class DECK():
 MAX_MEMBERS=5
 
 #STATES
-STATE_INIT	=2**0
-STATE_REGISTER	=2**1
-STATE_RAISE_HAND=2**2
-STATE_UNKNOWN	=2**3
-STATE_ALL_ABOVE=2**17-1
+STATE_INIT		=2**0
+STATE_REGISTER		=2**1
+STATE_RAISE_HAND	=2**2
+STATE_UNKNOWN		=2**3
+STATE_ALL_ABOVE		=2**17-1
 
-STATE_NEED_MEMBER=2**18
-STATE_DECK_MEMBER=2**19
-
+STATE_NEED_MEMBER 	=2**18
+STATE_DECK_MEMBER	=2**19
+STATE_NOT_DECK_MEMBER	=2**20
 
 def deco(state):
 	def STATER(func):
@@ -100,6 +100,8 @@ def deco(state):
 					return {'error': "No Member"}
 				if STATE_DECK_MEMBER&state and not hasattr(kwargs['member'],'card'):
 					return {'error': "No Deck Member"}
+				if STATE_NOT_DECK_MEMBER&state and (kwargs['member']==None or hasattr(kwargs['member'],'card')):
+					return {'error': "Deck Member is not allowed to call this function"}
 				try:
 					ret=func(self,*args,**kwargs)
 				except None:
@@ -153,8 +155,25 @@ class WORKER():
 		return {'return':m.secret_id}
 	
 	@deco(STATE_ALL_ABOVE)
-	def ext_get_players(self)
+	def ext_get_players(self):
 		return dict([(x.name,x.position) for x in self.members.values()])
+	
+	@deco(STATE_RAISE_HAND|STATE_NOT_DECK_MEMBER)
+	def ext_get_card(self,member):
+		card=self.deck.card
+		if card
+			member.num_of_cards+=1
+			return {'return':card}
+		elif self.deck.deck_empty
+			return {'return':None}	
+		return {'error': 'Please try again'}
+
+	@deco(STATE_RAISE_HAND|STATE_DECK_MEMBER)
+	def ext_set_card(self,card,member=None):
+		if not card:
+			self.deck.deck_empty=True
+		self.deck.card=card
+		return {'return': 'Card was set'}
 
 	def msg_work(self,msg):
 		if type(msg)!=type({}):
