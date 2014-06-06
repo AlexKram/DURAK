@@ -57,7 +57,7 @@ while 1:
 			print msg_server('set_card',[convert_card(deck.get_card())])
 			break;
 		if x=="set_players":
-			names=msg_server('get_players',[])['return']
+			names=[m[0] for m in msg_server('get_players',[])['return']]
 			if len(init_players-names)==0:
 				print msg_server('set_players',[list(init_players)])
 			break;
