@@ -383,7 +383,7 @@ class WORKER():
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 5005
-BUFFER_SIZE = 200  # Normally 1024, but we want fast response
+BUFFER_SIZE = 1024  # Normally 1024, but we want fast response
 MAX_INPUT_BUFFER=4096
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -441,7 +441,12 @@ while 1:
 	except:
 		pass
 	for inp in inputs.values():
-		if inp[0]=="client": inp[2]=parse_msg(inp[2],inp[1])
+		if inp[0]=="client": 
+			while True:
+				ml1=len(inp[2])
+				inp[2]=parse_msg(inp[2],inp[1])
+				if ml1==len(inp[2]):
+					break;
 	#print r,w,e,inputs
 
 
