@@ -138,6 +138,7 @@ class WORKER():
 		self.members={}
 		self.deck=DECK()
 		self.player_on_turn=None
+		self.player_to_pull=None
 		self.deck.trump_card=trump_card
 		self.STATE=STATE_REGISTER
 		return {'return': 'Initialisation successfull!'}
@@ -153,32 +154,34 @@ class WORKER():
 		return {'return':m.secret_id}
 	
 	@deco(STATE_ALL_ABOVE)
-	def ext_get_players(self):
-		return dict([(x.name,x.position) for x in self.members.values()])
+	def ext_get_players(self,**kwargs):
+		return {'return': dict([(x.name,x.position) for x in self.members.values()])}
 	
 	@deco(STATE_RAISE_HAND|STATE_NOT_DECK_MEMBER)
-	def ext_get_card(self,member):
+	def ext_get_card(self):
 		if len(self.members.values())==len(filter(lambda x: x.num_of_cards>=6,self.members.values())):
 			if self.player_on_turn==None:
 				self.STATE=STATE_FIRST_ATTACKER
 			else:
 				self.STATE=STATE_UNKNOWN
-			return {'error': 'We must go to next State"}
+			return {'error': 'We must go to next State'}
 
+		#if not self.player_on_turn==None:
+			#e=self.player_on_turn
+			#p=member.position
+			#list_of_=list(reversed(map(lambda x: (x+e+1)%4,range(0,4))))[0:(e-p)%4]
+			#ok_to_pull = len(list_of_)==len(filter(lambda x: (x.position in list_of_) and \
+								 #x.num_of_cards>=6,self.members.values()))
 
-		if not self.player_on_turn==None:
-			e=self.player_on_turn
-			p=member.position
-			list_of_=list(reversed(map(lambda x: (x+e+1)%4,range(0,4))))[0:(e-p)%4]
-			ok_to_pull = len(list_of_)==len(filter(lambda x: (x.position in list_of_) and \
-								 x.num_of_cards>=6,self.members.values()))
-
-		if member.num_of_cards<6 and (self.player_on_turn==None or ok_to_pull):
+		#if member.num_of_cards<6 and (self.player_on_turn==None or ok_to_pull):
+		if member.num_of_cards<6 and (self.player_to_pull==member or self.player_to_pull==None):
 			card=self.deck.card
 			if card:
 				member.num_of_cards+=1
+				if member.num_of_cards==6 and self.player_to_pull!=None:
+					self.player_to_pull=(self.player_to_pull-1)%len(self.members.keys())
 				return {'return':card}
-			elif self.deck.deck_empty
+			elif self.deck.deck_empty:
 				return {'return':None}	
 		return {'error': 'Please try again'}
 
