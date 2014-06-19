@@ -108,6 +108,11 @@ class WORKER():
 		self.player_on_turn=None
 		self.STATE=STATE_INIT
 
+
+#-----------------------------------------------
+#		EXT-Functions:
+#-----------------------------------------------
+
 	@deco(STATE_ALL_ABOVE)
 	def ext_get_tasks(self,member=None):
 		ret = ['get_tasks','get_trump_card','get_players']
@@ -128,9 +133,17 @@ class WORKER():
 				ret=['get_card']+ret
 			return {'return':ret}
 
-#-----------------------------------------------
-#		EXT-Functions:
-#-----------------------------------------------
+
+	@deco(STATE_ALL_ABOVE)
+	def ext_get_players(self):
+		return {'return': dict([(x.name,x.position) for x in self.members.values()])}
+
+	@deco(STATE_ALL_ABOVE)
+	def ext_get_trump_card(self):
+		return {'return': self.deck.trump_card}
+
+#-----------------------STATE_INIT----------------------------
+
 
 	@deco(STATE_INIT|STATE_DECK_MEMBER)
 	def ext_init_done(self,trump_card,member=None):
@@ -138,10 +151,13 @@ class WORKER():
 		self.members={}
 		self.deck=DECK()
 		self.player_on_turn=None
-		self.player_to_pull=None
+		self.order_to_pull=[]
 		self.deck.trump_card=trump_card
+		self.lowest_trump_card={}
 		self.STATE=STATE_REGISTER
 		return {'return': 'Initialisation successfull!'}
+
+#---------------------STATE_REGISTER--------------------------
 	
 	@deco(STATE_REGISTER)
 	def ext_get_id(self,name):
@@ -152,34 +168,35 @@ class WORKER():
 		m=MEMBER(name)
 		self.members[m.secret_id]=m
 		return {'return':m.secret_id}
-	
-	@deco(STATE_ALL_ABOVE)
-	def ext_get_players(self,**kwargs):
-		return {'return': dict([(x.name,x.position) for x in self.members.values()])}
+
+	@deco(STATE_REGISTER|STATE_DECK_MEMBER)
+	def ext_set_players(self,names):
+		names=list(set(names))
+		if len(names)<2:
+			return {'error' :"to few players"}
+		self.members=dict(filter(lambda x:x.name in names, self.members.items()))
+		for x in self.members:
+			x.position=names.index(x.name)
+		self.order_to_pull=sorted(self.members.values(), lambda k:k.position)
+		self.STATE=STATE_RAISE_HAND
+		return {'return': 'ok'}
+
+#---------------------STATE_RAISE_HAND-------------------------
 	
 	@deco(STATE_RAISE_HAND|STATE_NOT_DECK_MEMBER)
-	def ext_get_card(self):
-		if len(self.members.values())==len(filter(lambda x: x.num_of_cards>=6,self.members.values())):
-			if self.player_on_turn==None:
-				self.STATE=STATE_FIRST_ATTACKER
-			else:
-				self.STATE=STATE_UNKNOWN
-			return {'error': 'We must go to next State'}
+	def ext_get_card(self,member):
 
-		#if not self.player_on_turn==None:
-			#e=self.player_on_turn
-			#p=member.position
-			#list_of_=list(reversed(map(lambda x: (x+e+1)%4,range(0,4))))[0:(e-p)%4]
-			#ok_to_pull = len(list_of_)==len(filter(lambda x: (x.position in list_of_) and \
-								 #x.num_of_cards>=6,self.members.values()))
-
-		#if member.num_of_cards<6 and (self.player_on_turn==None or ok_to_pull):
-		if member.num_of_cards<6 and (self.player_to_pull==member or self.player_to_pull==None):
+		if self.order_to_pull[0]==member:
 			card=self.deck.card
 			if card:
 				member.num_of_cards+=1
-				if member.num_of_cards==6 and self.player_to_pull!=None:
-					self.player_to_pull=(self.player_to_pull-1)%len(self.members.keys())
+				if member.num_of_cards==6:
+					del self.order_to_pull[0]
+					if len(self.order_to_pull)==0:
+						if self.player_on_turn==None:
+							self.STATE=STATE_FIRST_ATTACKER
+						else:
+							self.STATE=STATE_UNKNOWN
 				return {'return':card}
 			elif self.deck.deck_empty:
 				return {'return':None}	
@@ -187,11 +204,34 @@ class WORKER():
 
 	@deco(STATE_RAISE_HAND|STATE_DECK_MEMBER)
 	def ext_set_card(self,card,member=None):
-		if not card:
+		if card==None:
 			self.deck.deck_empty=True
 		self.deck.card=card
 		return {'return': 'Card was set'}
 
+#--------------------STATE_FIRST_ATTACKER----------------------
+
+	
+
+	def m(k):
+		k[1].rank+500*(k[1].suit+1)*int(not k[1].trump)
+
+	@deco(STATE_FIRST_ATTACKER|STATE_NOT_DECK_MEMBER)
+	def ext_lowest_trump_card(self,card,member):
+		self.lowest_trump_card[member]=card
+		if len(self.lowest_trump_card)==len(self.members):
+			self.player_on_turn=sorted(self.lowest_trump_card.items(),m)[0]
+			self.STATE=self.STATE_UNKNOWN
+			
+		
+		
+
+		return {'return': 'Thank you for submitting your lowest trump card'}
+
+
+
+
+#-----------------------------------------------
 	def msg_work(self,msg):
 		if type(msg)!=type({}):
 			return {'error':'No dict given'}
